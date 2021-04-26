@@ -1,0 +1,20 @@
+<form [formGroup]="orderForm" class="form-inline">
+    <label class="sr-only" for="sideSelect">Side</label>
+    <select class="form-control mr-2 mb-2" id="sideSelect" formControlName="side">
+        <option value="BUY">Buy</option>
+        <option value="SELL">Sell</option>
+    </select>
+
+    <label class="sr-only" for="volumeInput">Volume</label>
+    <input type="text" class="form-control mr-2 mb-2" id="volumeInput" placeholder="Volume" formControlName="volume">
+
+    <label class="sr-only" for="priceInput">Price</label>
+    <div class="input-group mr-2 mb-2">
+        <div class="input-group-prepend">
+            <div class="input-group-text">@</div>
+        </div>
+        <input type="text" class="form-control" id="priceInput" placeholder="Price" formControlName="price">
+    </div>
+
+    <button type="button" class="btn btn-primary mb-2" (click)='onSend()'>Submit order</button>
+</form>

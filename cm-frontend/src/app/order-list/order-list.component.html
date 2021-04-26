@@ -1,0 +1,23 @@
+<table class="table table-borderless text-light" *ngIf="(orders | async)?.length">
+    <thead>
+        <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Filled Volume</th>
+            <th scope="col">Remaining Volume</th>
+            <th scope="col">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let order of orders | async">
+            <td>{{ order.side }} {{ order.total_volume | number:'1.0-0' }} {{ order.instrument }} @ {{ order.price | currency:'USD' }}</td>
+            <td>{{ order.filled_volume | number:'1.0-0' }}</td>
+            <td>{{ order.active_volume | number:'1.0-0' }}</td>
+            <td>
+                <span *ngIf="order.active_volume == 0" class="badge badge-success">Complete</span>
+                <span *ngIf="order.active_volume > 0" class="badge badge-danger">In market</span>
+                <button *ngIf="order.active_volume > 0" type="button" class="btn btn-link"
+                    (click)='onCancel(order.id)'>Cancel</button>
+            </td>
+        </tr>
+    </tbody>
+</table>

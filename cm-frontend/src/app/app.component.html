@@ -1,0 +1,32 @@
+<div class="container-lg">
+  <div class="row mt-5">
+    <div class="col-12">
+      <h1 class="display-1 text-light">Cloud Market 🚀</h1>
+      <p class="lead text-white-50 ml-3">Cool people trade with Cloud Market</p>
+    </div>
+  </div>
+
+  <div class="row mt-3">
+    <div class="col-12">
+      <input type="text" class="form-control form-control-lg" [formControl]="instrument" placeholder="What do you want to trade today?">
+    </div>
+  </div>
+
+  <div class="row mt-3" *ngIf="instrument.value">
+    <div class="col-12">
+      <app-send-order [instrument]="instrument"></app-send-order>
+    </div>
+  </div>
+
+  <div class="row mt-3" *ngIf="instrument.value">
+    <div class="col-12">
+      <app-orderbook [instrument]="instrument"></app-orderbook>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    <div class="col-12">
+      <app-order-list></app-order-list>
+    </div>
+  </div>
+</div>
