@@ -4,7 +4,7 @@ https://www.youtube.com/watch?v=n020fVRDgDc
 I built this to try out some technologies.
 
 ## Backend
-Node + Express + Firestore, hosted on Google App Engine.
+Node + Hapi + Firestore, hosted on Google App Engine.
 
 ## Frontend
 Angular + Bootstrap.
