@@ -156,7 +156,7 @@ server.route({
                 related_orders: data.related_orders.map((t: FirebaseFirestore.DocumentReference) => t.id)
             }
         } else {
-            h.response({error: `No trade for id: ${request.params.id}`}).code(404)
+            return h.response({error: `No trade for id: ${request.params.id}`}).code(404)
         }
     }
 })
@@ -219,5 +219,3 @@ process.on('unhandledRejection', (err) => {
     console.log(err);
     process.exit(1);
 });
-
-start()
