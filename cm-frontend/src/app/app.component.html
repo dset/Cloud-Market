@@ -1,4 +1,10 @@
 <div class="container-lg">
+  <div class="row mt-3" *ngIf="(user | async)?.state === 'LOGGED_IN'">
+    <div class="col-12">
+      <app-sign-out></app-sign-out>
+    </div>
+  </div>
+
   <div class="row mt-5">
     <div class="col-12">
       <h1 class="display-1 text-light">Cloud Market 🚀</h1>
@@ -6,27 +12,46 @@
     </div>
   </div>
 
-  <div class="row mt-3">
-    <div class="col-12">
-      <input type="text" class="form-control form-control-lg" [formControl]="instrument" placeholder="What do you want to trade today?">
+  <div *ngIf="user | async as usr">
+    <div *ngIf="usr.state === 'LOGGED_IN'">
+      <div class="row mt-3">
+        <div class="col-12">
+          <input type="text" class="form-control form-control-lg" [formControl]="instrument"
+            placeholder="Hello {{usr.state === 'LOGGED_IN' && usr.user.displayName}}, what do you want to trade today?">
+        </div>
+      </div>
+
+      <div class="row mt-3" *ngIf="instrument.value">
+        <div class="col-12">
+          <app-send-order [instrument]="instrument"></app-send-order>
+        </div>
+      </div>
+
+      <div class="row mt-3" *ngIf="instrument.value">
+        <div class="col-12">
+          <app-orderbook [instrument]="instrument"></app-orderbook>
+        </div>
+      </div>
+
+      <div class="row mt-5">
+        <div class="col-12">
+          <app-order-list></app-order-list>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="row mt-3" *ngIf="instrument.value">
+  <div class="row" *ngIf="(user | async)?.state === 'LOGGED_OUT'">
     <div class="col-12">
-      <app-send-order [instrument]="instrument"></app-send-order>
+      <app-sign-in></app-sign-in>
     </div>
   </div>
 
-  <div class="row mt-3" *ngIf="instrument.value">
-    <div class="col-12">
-      <app-orderbook [instrument]="instrument"></app-orderbook>
-    </div>
-  </div>
-
-  <div class="row mt-5">
-    <div class="col-12">
-      <app-order-list></app-order-list>
+  <div class="row mt-5" *ngIf="(user | async)?.state === 'UNKNOWN'">
+    <div class="col-12 d-flex justify-content-center">
+      <div class="spinner-border text-light" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
     </div>
   </div>
 </div>

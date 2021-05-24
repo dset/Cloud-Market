@@ -1,6 +1,7 @@
 import Path from 'path'
 import Hapi from '@hapi/hapi'
 import Inert from '@hapi/inert'
+import Boom from '@hapi/boom'
 import Joi from 'joi'
 import firebase from 'firebase-admin'
 import _ from 'lodash'
@@ -202,12 +203,36 @@ export async function start() {
     server.route({
         method: 'GET',
         path: '/{param*}',
+        options: {
+            auth: false
+        },
         handler: {
             directory: {
                 path: Path.join(__dirname, 'static')
             }
         }
     });
+
+    server.auth.scheme('firebase-jwt', () => {
+        return {
+            authenticate: async (request, h) => {
+                const auth = request.headers.authorization ?? ""
+                if (auth.startsWith('Bearer ')) {
+                    try {
+                        const decoded = await firebase.auth().verifyIdToken(auth.substring(7))
+                        return h.authenticated({credentials: {user: decoded.uid}})
+                    } catch (error) {
+                        return h.unauthenticated(Boom.unauthorized())
+                    }
+                } else {
+                    return h.unauthenticated(Boom.unauthorized())
+                }
+            }
+        }
+    })
+
+    server.auth.strategy('firebase-auth', 'firebase-jwt')
+    server.auth.default('firebase-auth')
 
     await server.start();
 
