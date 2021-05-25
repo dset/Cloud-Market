@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import {Component} from '@angular/core';
 import {map} from 'rxjs/operators';
 import {OrderService} from '../order.service';
 
@@ -9,7 +9,6 @@ import {OrderService} from '../order.service';
 })
 export class OrderListComponent {
   orders = this.orderService.observeOrders().pipe(
-    map((map) => [...map.values()]),
     map((orders) => orders.sort((a, b) => a.create_time - b.create_time))
   )
 

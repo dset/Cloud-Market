@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import CreateOrderParam from '../../../shared/create-order-param'
@@ -10,6 +10,7 @@ import Orderbook from '../../../shared/orderbook'
 
 const basePath = '/api/v1'
 const orderEndpoint = `${basePath}/orders`;
+const userOrdersEndpoint = `${basePath}/user/orders`
 const tradeEndpoint = `${basePath}/trades`;
 const orderbookEndpoint = `${basePath}/orderbooks`;
 
@@ -22,6 +23,10 @@ export class ApiService {
 
   createOrder(order: CreateOrderParam): Observable<Id> {
     return this.http.post<Id>(orderEndpoint, order);
+  }
+
+  getUserOrders(): Observable<Order[]> {
+    return this.http.get<Order[]>(userOrdersEndpoint)
   }
 
   getOrder(id: string): Observable<Order> {
