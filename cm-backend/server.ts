@@ -43,6 +43,7 @@ server.route({
     },
     handler: async (request, h) => {
         const {instrument, side, volume, price} = request.payload as CreateOrderParam
+        const user = request.auth.credentials.user
 
         const id = await firestore.runTransaction(async (t) => {
             const query = firestore.collection('orders')
@@ -65,6 +66,11 @@ server.route({
                     break;
                 }
 
+                if (user === order.data().user) {
+                    // We don't match a user against their own orders
+                    continue
+                }
+
                 const matchingVolume = Math.min(remainingVolume, orderVolume)
                 const trade = firestore.collection('trades').doc()
                 trades.push(trade)
@@ -72,7 +78,8 @@ server.route({
                 t.create(trade, {
                     volume: matchingVolume,
                     price: orderPrice,
-                    related_orders: [newOrderRef, order.ref]
+                    related_orders: [newOrderRef, order.ref],
+                    users: [user, order.data().user]
                 })
                     .update(order.ref, {
                         active_volume: orderVolume - matchingVolume,
@@ -87,6 +94,7 @@ server.route({
             }
 
             t.create(newOrderRef, {
+                user: user,
                 instrument: instrument,
                 side: side,
                 total_volume: volume,
@@ -103,61 +111,91 @@ server.route({
     }
 })
 
+// It would be really nice to leverage firebase's built-in access control, but if I'm reading this correctly, it is not possible?
+// https://stackoverflow.com/questions/52176402/how-to-make-firebase-functions-act-as-a-user-instead-of-being-an-admin
+function verifyOwner(request: Hapi.Request, order: FirebaseFirestore.DocumentSnapshot) {
+    if (request.auth.credentials.user !== order.data().user) {
+        throw Boom.unauthorized()
+    }
+}
+
+function toApiOrder(order: FirebaseFirestore.DocumentSnapshot) {
+    const data = order.data()
+    return {
+        id: order.ref.id,
+        instrument: data.instrument,
+        side: data.side,
+        total_volume: data.total_volume,
+        active_volume: data.active_volume,
+        filled_volume: data.filled_volume,
+        price: data.price,
+        related_trades: data.related_trades.map((t: FirebaseFirestore.DocumentReference) => t.id),
+        create_time: order.createTime?.toMillis() ?? 0
+    }
+}
+
+server.route({
+    method: 'GET',
+    path: '/api/v1/user/orders',
+    handler: async (request) => {
+        const orders = await firestore.collection('orders')
+            .where('user', '==', request.auth.credentials.user)
+            .get()
+
+        return orders.docs.map(toApiOrder).sort((a, b) => a.create_time - b.create_time)
+    }
+})
+
 server.route({
     method: 'GET',
     path: '/api/v1/orders/{id}',
-    handler: async (request, h) => {
+    handler: async (request) => {
         const order = await firestore.collection('orders').doc(request.params.id).get()
-        if (order.exists) {
-            const data = order.data()
-            return {
-                id: order.ref.id,
-                instrument: data.instrument,
-                side: data.side,
-                total_volume: data.total_volume,
-                active_volume: data.active_volume,
-                filled_volume: data.filled_volume,
-                price: data.price,
-                related_trades: data.related_trades.map((t: FirebaseFirestore.DocumentReference) => t.id),
-                create_time: order.createTime?.toMillis() ?? 0
-            }
-        } else {
-            return h.response({error: `No order for id: ${request.params.id}`}).code(404)
+        if (!order.exists) {
+            throw Boom.notFound(`No order for id: ${request.params.id}`)
         }
+
+        verifyOwner(request, order)
+        return toApiOrder(order)
     }
 })
 
 server.route({
     method: 'DELETE',
     path: '/api/v1/orders/{id}',
-    handler: async (request, h) => {
-        try {
-            await firestore.collection('orders').doc(request.params.id).update({active_volume: 0})
-            return {}
-        } catch (error) {
-            if (error.code === firebase.firestore.GrpcStatus.NOT_FOUND) {
-                return h.response({error: `No order for id: ${request.params.id}`}).code(404)
-            } else {
-                throw error
-            }
+    handler: async (request) => {
+        const doc = firestore.collection('orders').doc(request.params.id)
+
+        const order = await doc.get()
+        if (!order.exists) {
+            throw Boom.notFound(`No order for id: ${request.params.id}`)
         }
+
+        verifyOwner(request, order)
+
+        await doc.update({active_volume: 0})
+        return {}
     }
 })
 
 server.route({
     method: 'GET',
     path: '/api/v1/trades/{id}',
-    handler: async (request, h) => {
+    handler: async (request) => {
         const trade = await firestore.collection('trades').doc(request.params.id).get()
-        if (trade.exists) {
-            const data = trade.data()
-            return {
-                volume: data.volume,
-                price: data.price,
-                related_orders: data.related_orders.map((t: FirebaseFirestore.DocumentReference) => t.id)
-            }
-        } else {
-            return h.response({error: `No trade for id: ${request.params.id}`}).code(404)
+        if (!trade.exists) {
+            throw Boom.notFound(`No trade for id: ${request.params.id}`)
+        }
+
+        const data = trade.data()
+        if (!data.users.includes(request.auth.credentials.user)) {
+            throw Boom.unauthorized()
+        }
+
+        return {
+            volume: data.volume,
+            price: data.price,
+            related_orders: data.related_orders.map((t: FirebaseFirestore.DocumentReference) => t.id)
         }
     }
 })
@@ -192,6 +230,27 @@ server.route({
     }
 })
 
+server.auth.scheme('firebase-jwt', () => {
+    return {
+        authenticate: async (request, h) => {
+            const auth = request.headers.authorization ?? ""
+            if (auth.startsWith('Bearer ')) {
+                try {
+                    const decoded = await firebase.auth().verifyIdToken(auth.substring(7))
+                    return h.authenticated({credentials: {user: decoded.uid}})
+                } catch (error) {
+                    return h.unauthenticated(Boom.unauthorized())
+                }
+            } else {
+                return h.unauthenticated(Boom.unauthorized())
+            }
+        }
+    }
+})
+
+server.auth.strategy('firebase-auth', 'firebase-jwt')
+server.auth.default('firebase-auth')
+
 export async function init() {
     await server.initialize();
     return server;
@@ -212,27 +271,6 @@ export async function start() {
             }
         }
     });
-
-    server.auth.scheme('firebase-jwt', () => {
-        return {
-            authenticate: async (request, h) => {
-                const auth = request.headers.authorization ?? ""
-                if (auth.startsWith('Bearer ')) {
-                    try {
-                        const decoded = await firebase.auth().verifyIdToken(auth.substring(7))
-                        return h.authenticated({credentials: {user: decoded.uid}})
-                    } catch (error) {
-                        return h.unauthenticated(Boom.unauthorized())
-                    }
-                } else {
-                    return h.unauthenticated(Boom.unauthorized())
-                }
-            }
-        }
-    })
-
-    server.auth.strategy('firebase-auth', 'firebase-jwt')
-    server.auth.default('firebase-auth')
 
     await server.start();
 
